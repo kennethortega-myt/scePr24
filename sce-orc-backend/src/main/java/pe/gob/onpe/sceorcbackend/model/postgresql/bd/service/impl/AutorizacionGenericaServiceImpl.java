@@ -1,0 +1,71 @@
+package pe.gob.onpe.sceorcbackend.model.postgresql.bd.service.impl;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import pe.gob.onpe.sceorcbackend.model.dto.AutorizacionNacionRequestDto;
+import pe.gob.onpe.sceorcbackend.model.dto.AutorizacionNacionResponseDto;
+import pe.gob.onpe.sceorcbackend.model.dto.response.GenericResponse;
+import pe.gob.onpe.sceorcbackend.model.postgresql.bd.service.AutorizacionGenericaService;
+import pe.gob.onpe.sceorcbackend.utils.ConstantesComunes;
+import pe.gob.onpe.sceorcbackend.utils.SceConstantes;
+
+@Service
+public class AutorizacionGenericaServiceImpl implements AutorizacionGenericaService {
+
+    @Value("${sce.nacion.url}")
+    private String urlNacion;
+
+    private final RestTemplate clientExport;
+
+    public AutorizacionGenericaServiceImpl(RestTemplate clientExport) {
+        this.clientExport = clientExport;
+    }
+
+
+    @Override
+    public AutorizacionNacionResponseDto getAutorizacionNacion(String usuario, String cc, String proceso, String tipoAutorizacion) {
+        AutorizacionNacionRequestDto request = new AutorizacionNacionRequestDto();
+        request.setCc(cc);
+        request.setUsuario(usuario);
+        request.setTipoAutorizacion(tipoAutorizacion);
+
+        HttpEntity<AutorizacionNacionRequestDto> httpEntity = new HttpEntity<>(request, getHeaderAutorizacion(proceso));
+
+        ResponseEntity<AutorizacionNacionResponseDto> response = this.clientExport.exchange(
+                urlNacion + ConstantesComunes.URL_NACION_RECIBIR_AUTORIZACION,
+                HttpMethod.PATCH,
+                httpEntity,
+                AutorizacionNacionResponseDto.class);
+        return response.getBody();
+    }
+
+    @Override
+    public Boolean solicitaAutorizacionNacion(String usuario, String cc, String proceso, String tipoAutorizacion) {
+        AutorizacionNacionRequestDto request = new AutorizacionNacionRequestDto();
+        request.setCc(cc);
+        request.setUsuario(usuario);
+        request.setTipoAutorizacion(tipoAutorizacion);
+
+        HttpEntity<AutorizacionNacionRequestDto> httpEntity = new HttpEntity<>(request, getHeaderAutorizacion(proceso));
+
+        @SuppressWarnings("rawtypes")
+        ResponseEntity<GenericResponse> response = this.clientExport.exchange(
+                urlNacion + ConstantesComunes.URL_NACION_RECIBIR_SOLICITUD_AUTORIZACION,
+                HttpMethod.PATCH,
+                httpEntity,
+                GenericResponse.class);
+
+        GenericResponse<?> body = response.getBody();
+        return body != null && body.isSuccess();
+    }
+
+    private HttpHeaders getHeaderAutorizacion(String proceso){
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(SceConstantes.USERAGENT_HEADER, SceConstantes.USERAGENT_HEADER_VALUE);
+        headers.set(SceConstantes.TENANT_HEADER, proceso);
+        headers.set(SceConstantes.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        return headers;
+    }
+}
